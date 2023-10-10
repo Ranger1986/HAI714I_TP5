@@ -102,9 +102,15 @@ void Mesh::simplify(unsigned int resolution) {
             {
                 min[dim]=valeur_evalue;
             }            
-        }
-        
+        }  
     }
+    //marges
+    max[0]+=0.5;
+    max[1]+=0.5;
+    max[2]+=0.5;
+    min[0]-=0.5;
+    min[1]-=0.5;
+    min[2]-=0.5;
     
     // Create a grid of size resolution x resolution x resolution in the cube
     Grid gr;
@@ -159,7 +165,7 @@ void Mesh::simplify(unsigned int resolution) {
     // Normalize the normals
     std::vector< Vec3 > new_vertices;
     std::vector< Vec3 > new_normals;
-    for (long i = 0; i < (resolution*resolution*resolution); i++)
+    for (int i = 0; i < (resolution*resolution*resolution); i++)
     {
         Vec3 pos= gr.cells[i].pos/gr.cells[i].nbVertices;
         Vec3 norm= gr.cells[i].norm;
