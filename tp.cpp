@@ -105,12 +105,12 @@ void Mesh::simplify(unsigned int resolution) {
         }  
     }
     //marges
-    max[0]+=0.5;
-    max[1]+=0.5;
-    max[2]+=0.5;
-    min[0]-=0.5;
-    min[1]-=0.5;
-    min[2]-=0.5;
+    max[0]+=0.15;
+    max[1]+=0.15;
+    max[2]+=0.15;
+    min[0]-=0.15;
+    min[1]-=0.15;
+    min[2]-=0.15;
     
     // Create a grid of size resolution x resolution x resolution in the cube
     Grid gr;
@@ -158,7 +158,6 @@ void Mesh::simplify(unsigned int resolution) {
             new_triangles.push_back(new_triangle);
         }
     }
-    //this->triangles.clear();
     this->triangles=new_triangles;
     
     // Divide the position of each representant by the number of vertices in the cell.
@@ -173,8 +172,6 @@ void Mesh::simplify(unsigned int resolution) {
         new_vertices.push_back(pos);
         new_normals.push_back(norm);
     }
-    //this->vertices.clear();
-    //this->normals.clear();
     this->vertices=new_vertices;
     this->normals=new_normals;
     
