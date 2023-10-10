@@ -21,6 +21,7 @@
 #include <string>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 
 #include <algorithm>
 #include <GL/glut.h>
@@ -28,6 +29,7 @@
 #include "src/Vec3.h"
 #include "src/Camera.h"
 
+enum DisplayMode{ WIRE=0, SOLID=1, LIGHTED_WIRE=2, LIGHTED=3 };
 
 struct Triangle {
     inline Triangle () {
@@ -50,48 +52,66 @@ struct Triangle {
     unsigned int v[3];
 };
 
-
 struct Mesh {
     std::vector< Vec3 > vertices; //array of mesh vertices positions
     std::vector< Vec3 > normals; //array of vertices normals useful for the display
     std::vector< Triangle > triangles; //array of mesh triangles
     std::vector< Vec3 > triangle_normals; //triangle normals to display face normals
 
-    //Compute face normals for the display
-    void computeTrianglesNormals(){
-
-        //A faire : implémenter le calcul des normales par face
-        //Attention commencer la fonction par triangle_normals.clear();
-        //Iterer sur les triangles
-
-        //La normal du triangle i est le resultat du produit vectoriel de deux ses arêtes e_10 et e_20 normalisé (e_10^e_20)
-        //L'arete e_10 est représentée par le vecteur partant du sommet 0 (triangles[i][0]) au sommet 1 (triangles[i][1])
-        //L'arete e_20 est représentée par le vecteur partant du sommet 0 (triangles[i][0]) au sommet 2 (triangles[i][2])
-
-        //Normaliser et ajouter dans triangle_normales
-    }
-
-    //Compute vertices normals as the average of its incident faces normals
-    void computeVerticesNormals(){
-
-        //A faire : implémenter le calcul des normales par sommet comme la moyenne des normales des triangles incidents
-        //Attention commencer la fonction par normals.clear();
-        //Initializer le vecteur normals taille vertices.size() avec Vec3(0., 0., 0.)
-        //Iterer sur les triangles
-
-        //Pour chaque triangle i
-        //Ajouter la normal au triangle à celle de chacun des sommets
-
-        //Iterer sur les normales et les normaliser
-
-
-    }
-
-    void computeNormals(){
-        computeTrianglesNormals();
-        computeVerticesNormals();
-    }
+    void simplify(unsigned int resolution);
+    void adaptativeSimplify (unsigned int numOfPerLeafVertices);
 };
+
+struct GridData {
+    // Information to store in the grid's cells
+};
+struct Grid {
+    std::vector<GridData> cells;
+
+    Vec3 minPos, maxPos;
+    int resolution;
+
+    int getCellX(Vec3 pos) { return resolution * (pos[0] - minPos[0]) / (maxPos[0] - minPos[0]); }
+    int getCellY(Vec3 pos) { return resolution * (pos[1] - minPos[1]) / (maxPos[1] - minPos[1]); }
+    int getCellZ(Vec3 pos) { return resolution * (pos[2] - minPos[2]) / (maxPos[2] - minPos[2]); }
+
+    int getIndex(int x, int y, int z) { return x * resolution * resolution + y * resolution + z; }
+    int getIndex(Vec3 pos) { return getCellX(pos) * resolution * resolution + getCellY(pos) * resolution + getCellZ(pos); }
+};
+
+void Mesh::simplify(unsigned int resolution) {
+    std::cerr << "Simplification to be done." << std::endl;
+    // Compute the cube C that englobes all vertices
+
+    // Create a grid of size resolution x resolution x resolution in the cube
+
+    // For each vertex, add the position and normal to its representant in the grid
+    // (Count the number of vertices per cell)
+
+    // For each triangle t, set the indices of its vertices to point to representants
+    // If 2 vertices share the same representant, remove the triangle
+
+    // Divide the position of each representant by the number of vertices in the cell.
+    // Normalize the normals
+
+    // BONUS EXERCICE : Instead of using the mean position of the vertices in the cell,
+    // use the QEM proposed in "Out-of-core simplification of large polygonal models."
+    // Peter Lindstrom. SIGGRAPH 2000 (http://wwwevasion.imag.fr/people/Franck.Hetroy/Teaching/Geo3D/Articles/lindstrom2000.pdf)
+    // You might need to change the content of GridData and the way to process it
+}
+
+void Mesh::adaptativeSimplify(unsigned int numOfPerLeafVertices) {
+    std::cerr << "Adaptative simplification to be done." << std::endl;
+
+    // Create (or copy from internet) an Octree class
+    // Insert vertices in the Octree. If a node contains more than "numOfPerLeafVertices", divide it into children.
+
+    // Compute the mean position and normal for each leaf's representant
+
+    // For each triangle t, set the indices of its vertices to point to representants
+    // If 2 vertices share the same representant, remove the triangle
+}
+
 
 //Transformation made of a rotation and translation
 struct Transformation {
@@ -99,43 +119,37 @@ struct Transformation {
     Vec3 translation;
 };
 
-//Basis ( origin, i, j ,k )
-struct Basis {
-    inline Basis ( Vec3 const & i_origin,  Vec3 const & i_i, Vec3 const & i_j, Vec3 const & i_k) {
-        origin = i_origin; i = i_i ; j = i_j ; k = i_k;
+void collect_one_ring (std::vector<Vec3> const & i_vertices,
+                       std::vector< Triangle > const & i_triangles,
+                       std::vector<std::vector<unsigned int> > & o_one_ring) {//one-ring of each vertex, i.e. a list of vertices with which it shares an edge
+    //Initialiser le vecetur de o_one_ring de la taille du vecteur vertices
+    o_one_ring = std::vector<std::vector<unsigned int>>(i_vertices.size());
+    //Parcourir les triangles et ajouter les voisins dans le 1-voisinage
+    for (auto& t : i_triangles) {
+        unsigned int i0 = t[0];
+        unsigned int i1 = t[1];
+        unsigned int i2 = t[2];
+        if (std::find(o_one_ring[i0].begin(), o_one_ring[i0].end(), i1) == o_one_ring[i0].end()) o_one_ring[i0].push_back(i1);
+        if (std::find(o_one_ring[i0].begin(), o_one_ring[i0].end(), i2) == o_one_ring[i0].end()) o_one_ring[i0].push_back(i2);
+        
+        if (std::find(o_one_ring[i1].begin(), o_one_ring[i1].end(), i0) == o_one_ring[i1].end()) o_one_ring[i1].push_back(i0);
+        if (std::find(o_one_ring[i1].begin(), o_one_ring[i1].end(), i2) == o_one_ring[i1].end()) o_one_ring[i1].push_back(i2);
+        
+        if (std::find(o_one_ring[i2].begin(), o_one_ring[i2].end(), i0) == o_one_ring[i2].end()) o_one_ring[i2].push_back(i0);
+        if (std::find(o_one_ring[i2].begin(), o_one_ring[i2].end(), i1) == o_one_ring[i2].end()) o_one_ring[i2].push_back(i1);
     }
 
-    inline Basis ( ) {
-        origin = Vec3(0., 0., 0.);
-        i = Vec3(1., 0., 0.) ; j = Vec3(0., 1., 0.) ; k = Vec3(0., 0., 1.);
-    }
-    Vec3 operator [] (unsigned int ib) {
-        if(ib==0) return i;
-        if(ib==1) return j;
-        return k;}
-
-    Vec3 origin;
-    Vec3 i;
-    Vec3 j;
-    Vec3 k;
-};
+}
 
 //Input mesh loaded at the launch of the application
+Mesh originalMesh;
 Mesh mesh;
-//Mesh on which a transformation is applied
-Mesh transformed_mesh;
-
-Transformation mesh_transformation;
-Mat3 normal_transformation;
-
-Basis basis;
-Basis transformed_basis;
 
 bool display_normals;
-bool display_smooth_normals;
 bool display_mesh;
-bool display_transformed_mesh;
-bool display_basis;
+DisplayMode displayMode;
+int simplificationResolution = 20;  // GRID RESOLUTION
+int nodesPerLeafInOctree = 2;       // OCTREE "RESOLUTION"
 
 // -------------------------------------------
 // OpenGL/GLUT application code.
@@ -155,10 +169,10 @@ static bool fullScreen = false;
 // File I/O
 // ------------------------------------
 bool saveOFF( const std::string & filename ,
-              std::vector< Vec3 > & i_vertices ,
-              std::vector< Vec3 > & i_normals ,
-              std::vector< Triangle > & i_triangles,
-              std::vector< Vec3 > & i_triangle_normals ,
+              std::vector< Vec3 > const & i_vertices ,
+              std::vector< Vec3 > const & i_normals ,
+              std::vector< Triangle > const & i_triangles,
+              std::vector< Vec3 > const & i_triangle_normals ,
               bool save_normals = true ) {
     std::ofstream myfile;
     myfile.open(filename.c_str());
@@ -202,8 +216,10 @@ void openOFF( std::string const & filename,
     }
 
     std::string magic_s;
+    int iLine = 0;
 
     myfile >> magic_s;
+    iLine++;
 
     if( magic_s != "OFF" )
     {
@@ -214,6 +230,7 @@ void openOFF( std::string const & filename,
 
     int n_vertices , n_faces , dummy_int;
     myfile >> n_vertices >> n_faces >> dummy_int;
+    iLine++;
 
     o_vertices.clear();
     o_normals.clear();
@@ -229,6 +246,7 @@ void openOFF( std::string const & filename,
             myfile >> x >> y >> z;
             o_normals.push_back( Vec3( x , y , z ) );
         }
+        iLine++;
     }
 
     o_triangles.clear();
@@ -267,10 +285,11 @@ void openOFF( std::string const & filename,
         }
         else
         {
-            std::cout << "We handle ONLY *.off files with 3 or 4 vertices per face" << std::endl;
+            std::cout << "We handle ONLY *.off files with 3 or 4 vertices per face (here = " << n_vertices_on_face << " on line " << iLine << ")" << std::endl;
             myfile.close();
             exit(1);
         }
+        iLine++;
     }
 
 }
@@ -306,8 +325,7 @@ void init () {
 
     display_normals = false;
     display_mesh = true;
-    display_transformed_mesh = true;
-    display_smooth_normals = true;
+    displayMode = LIGHTED;
 }
 
 
@@ -342,58 +360,78 @@ void drawReferenceFrame( Vec3 const & origin, Vec3 const & i, Vec3 const & j, Ve
 
 }
 
-void drawReferenceFrame( Basis & i_basis ) {
-    drawReferenceFrame( i_basis.origin, i_basis.i, i_basis.j, i_basis.k );
-}
+typedef struct {
+    float r;       // ∈ [0, 1]
+    float g;       // ∈ [0, 1]
+    float b;       // ∈ [0, 1]
+} RGB;
 
-void drawSmoothTriangleMesh( Mesh const & i_mesh ) {
-    glBegin(GL_TRIANGLES);
-    for(unsigned int tIt = 0 ; tIt < i_mesh.triangles.size(); ++tIt) {
-        Vec3 p0 = i_mesh.vertices[i_mesh.triangles[tIt][0]]; //Vertex position
-        Vec3 n0 = i_mesh.normals[i_mesh.triangles[tIt][0]]; //Vertex normal
 
-        Vec3 p1 = i_mesh.vertices[i_mesh.triangles[tIt][1]];
-        Vec3 n1 = i_mesh.normals[i_mesh.triangles[tIt][1]];
 
-        Vec3 p2 = i_mesh.vertices[i_mesh.triangles[tIt][2]];
-        Vec3 n2 = i_mesh.normals[i_mesh.triangles[tIt][2]];
+RGB scalarToRGB( float scalar_value ) //Scalar_value ∈ [0, 1]
+{
+    RGB rgb;
+    float H = scalar_value*360., S = 1., V = 0.85,
+            P, Q, T,
+            fract;
 
-        glNormal3f( n0[0] , n0[1] , n0[2] );
-        glVertex3f( p0[0] , p0[1] , p0[2] );
-        glNormal3f( n1[0] , n1[1] , n1[2] );
-        glVertex3f( p1[0] , p1[1] , p1[2] );
-        glNormal3f( n2[0] , n2[1] , n2[2] );
-        glVertex3f( p2[0] , p2[1] , p2[2] );
-    }
-    glEnd();
+    (H == 360.)?(H = 0.):(H /= 60.);
+    fract = H - floor(H);
 
-}
+    P = V*(1. - S);
+    Q = V*(1. - S*fract);
+    T = V*(1. - S*(1. - fract));
 
-void drawTriangleMesh( Mesh const & i_mesh ) {
-    glBegin(GL_TRIANGLES);
-    for(unsigned int tIt = 0 ; tIt < i_mesh.triangles.size(); ++tIt) {
-        Vec3 p0 = i_mesh.vertices[i_mesh.triangles[tIt][0]];
-        Vec3 p1 = i_mesh.vertices[i_mesh.triangles[tIt][1]];
-        Vec3 p2 = i_mesh.vertices[i_mesh.triangles[tIt][2]];
-
-        //Face normal
-        Vec3 n = i_mesh.triangle_normals[tIt];
-
-        glNormal3f( n[0] , n[1] , n[2] );
-
-        glVertex3f( p0[0] , p0[1] , p0[2] );
-        glVertex3f( p1[0] , p1[1] , p1[2] );
-        glVertex3f( p2[0] , p2[1] , p2[2] );
-    }
-    glEnd();
-
-}
-
-void drawMesh( Mesh const & i_mesh ){
-    if(display_smooth_normals)
-        drawSmoothTriangleMesh(i_mesh) ; //Smooth display with vertices normals
+    if      (0. <= H && H < 1.)
+        rgb = (RGB){.r = V, .g = T, .b = P};
+    else if (1. <= H && H < 2.)
+        rgb = (RGB){.r = Q, .g = V, .b = P};
+    else if (2. <= H && H < 3.)
+        rgb = (RGB){.r = P, .g = V, .b = T};
+    else if (3. <= H && H < 4.)
+        rgb = (RGB){.r = P, .g = Q, .b = V};
+    else if (4. <= H && H < 5.)
+        rgb = (RGB){.r = T, .g = P, .b = V};
+    else if (5. <= H && H < 6.)
+        rgb = (RGB){.r = V, .g = P, .b = Q};
     else
-        drawTriangleMesh(i_mesh) ; //Display with face normals
+        rgb = (RGB){.r = 0., .g = 0., .b = 0.};
+
+    return rgb;
+}
+
+void drawSmoothTriangleMesh( Mesh const & i_mesh , bool draw_field = false ) {
+    glBegin(GL_TRIANGLES);
+    for(unsigned int tIt = 0 ; tIt < i_mesh.triangles.size(); ++tIt) {
+
+        for(unsigned int i = 0 ; i < 3 ; i++) {
+            const Vec3 & p = i_mesh.vertices[i_mesh.triangles[tIt][i]]; //Vertex position
+            const Vec3 & n = i_mesh.normals[i_mesh.triangles[tIt][i]]; //Vertex normal
+
+            glNormal3f( n[0] , n[1] , n[2] );
+            glVertex3f( p[0] , p[1] , p[2] );
+        }
+    }
+    glEnd();
+
+}
+
+void drawTriangleMesh( Mesh const & i_mesh , bool draw_field = false  ) {
+    glBegin(GL_TRIANGLES);
+    for(unsigned int tIt = 0 ; tIt < i_mesh.triangles.size(); ++tIt) {
+        const Vec3 & n = i_mesh.triangle_normals[ tIt ]; //Triangle normal
+        for(unsigned int i = 0 ; i < 3 ; i++) {
+            const Vec3 & p = i_mesh.vertices[i_mesh.triangles[tIt][i]]; //Vertex position
+            glNormal3f( n[0] , n[1] , n[2] );
+            glVertex3f( p[0] , p[1] , p[2] );
+        }
+    }
+    glEnd();
+
+}
+
+void drawMesh( Mesh const & i_mesh , bool draw_field = false ){
+    drawSmoothTriangleMesh(i_mesh, draw_field) ; //Smooth display with vertices normals
 }
 
 void drawVectorField( std::vector<Vec3> const & i_positions, std::vector<Vec3> const & i_directions ) {
@@ -405,58 +443,68 @@ void drawVectorField( std::vector<Vec3> const & i_positions, std::vector<Vec3> c
 }
 
 void drawNormals(Mesh const& i_mesh){
-
-    if(display_smooth_normals){
-        drawVectorField( i_mesh.vertices, i_mesh.normals );
-    } else {
-        std::vector<Vec3> triangle_baricenters;
-        for ( const Triangle& triangle : i_mesh.triangles ){
-            Vec3 triangle_baricenter (0.,0.,0.);
-            for( unsigned int i = 0 ; i < 3 ; i++ )
-                triangle_baricenter += i_mesh.vertices[triangle[i]];
-            triangle_baricenter /= 3.;
-            triangle_baricenters.push_back(triangle_baricenter);
-        }
-
-        drawVectorField( triangle_baricenters, i_mesh.triangle_normals );
-    }
+    drawVectorField( i_mesh.vertices, i_mesh.normals );
 }
 
 //Draw fonction
 void draw () {
 
-    if( display_mesh ){
-        glColor3f(0.8,1,0.8);
-        drawMesh(mesh);
 
-        glDisable(GL_LIGHTING);
-        if(display_normals){
-            glColor3f(1.,0.,0.);
-            drawNormals(mesh);
-        }
 
-        if( display_basis ){
-            drawReferenceFrame(basis);
-        }
+    if(displayMode == LIGHTED || displayMode == LIGHTED_WIRE){
+
+        glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
         glEnable(GL_LIGHTING);
+
+    }  else if(displayMode == WIRE){
+
+        glPolygonMode (GL_FRONT_AND_BACK, GL_LINE);
+        glDisable (GL_LIGHTING);
+
+    }  else if(displayMode == SOLID ){
+        glDisable (GL_LIGHTING);
+        glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
+
     }
 
-    if( display_transformed_mesh ){
-        glColor3f(0.8,0.8,1);
-        drawMesh(transformed_mesh);
+    glColor3f(0.8,1,0.8);
+    drawMesh(mesh, true);
 
-        glDisable(GL_LIGHTING);
-        if(display_normals){
-            glColor3f(1.,0.,0.);
-            drawNormals(transformed_mesh);
-        }
+    if(displayMode == SOLID || displayMode == LIGHTED_WIRE){
+        glEnable (GL_POLYGON_OFFSET_LINE);
+        glPolygonMode (GL_FRONT_AND_BACK, GL_LINE);
+        glLineWidth (1.0f);
+        glPolygonOffset (-2.0, 1.0);
 
-        if( display_basis ){
-            drawReferenceFrame(transformed_basis);
-        }
-        glEnable(GL_LIGHTING);
+        glColor3f(0.,0.,0.);
+        drawMesh(mesh, false);
+
+        glDisable (GL_POLYGON_OFFSET_LINE);
+        glEnable (GL_LIGHTING);
     }
 
+
+
+    glDisable(GL_LIGHTING);
+    if(display_normals){
+        glColor3f(1.,0.,0.);
+        drawNormals(mesh);
+    }
+    glEnable(GL_LIGHTING);
+
+    glutSetWindowTitle(("TP HAI714I | verts: " + std::to_string(mesh.vertices.size()) + " res: " + std::to_string(simplificationResolution) + " nodes: " + std::to_string(nodesPerLeafInOctree)).c_str());
+
+}
+
+void changeDisplayMode(){
+    if(displayMode == LIGHTED)
+        displayMode = LIGHTED_WIRE;
+    else if(displayMode == LIGHTED_WIRE)
+        displayMode = SOLID;
+    else if(displayMode == SOLID)
+        displayMode = WIRE;
+    else
+        displayMode = LIGHTED;
 }
 
 void display () {
@@ -489,34 +537,42 @@ void key (unsigned char keyPressed, int x, int y) {
         break;
 
 
-    case 'w':
-        GLint polygonMode[2];
-        glGetIntegerv(GL_POLYGON_MODE, polygonMode);
-        if(polygonMode[0] != GL_FILL)
-            glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
-        else
-            glPolygonMode (GL_FRONT_AND_BACK, GL_LINE);
+    case 'w': //Change le mode d'affichage
+        changeDisplayMode();
         break;
 
-
-    case 'b': //Toggle basis display
-        display_basis = !display_basis;
-        break;
 
     case 'n': //Press n key to display normals
         display_normals = !display_normals;
         break;
 
-    case '1': //Toggle loaded mesh display
-        display_mesh = !display_mesh;
+    case '1': // Reset the mesh
+        mesh = originalMesh;
         break;
 
-    case '2': //Toggle transformed mesh display
-        display_transformed_mesh = !display_transformed_mesh;
+    case '2': // Simplification by grid
+        mesh = originalMesh;
+        mesh.simplify(simplificationResolution);
         break;
 
-    case 's': //Switches between face normals and vertices normals
-        display_smooth_normals = !display_smooth_normals;
+    case '3': // Simplification from Octree
+        mesh = originalMesh;
+        mesh.adaptativeSimplify(nodesPerLeafInOctree);
+        break;
+
+    // Set the key input to increase/decrease resolutions
+    case 'a':
+        simplificationResolution = std::max(1, simplificationResolution - 1);
+        break;
+    case 'q':
+        simplificationResolution = std::max(1, simplificationResolution + 1);
+        break;
+
+    case 'd':
+        nodesPerLeafInOctree = std::max(1, nodesPerLeafInOctree - 1);
+        break;
+    case 'e':
+        nodesPerLeafInOctree = std::max(1, nodesPerLeafInOctree + 1);
         break;
 
     default:
@@ -587,7 +643,7 @@ int main (int argc, char ** argv) {
     glutInit (&argc, argv);
     glutInitDisplayMode (GLUT_RGBA | GLUT_DEPTH | GLUT_DOUBLE);
     glutInitWindowSize (SCREENWIDTH, SCREENHEIGHT);
-    window = glutCreateWindow ("TP HAI702I");
+    window = glutCreateWindow ("TP HAI714I");
 
     init ();
     glutIdleFunc (idle);
@@ -599,24 +655,12 @@ int main (int argc, char ** argv) {
     key ('?', 0, 0);
 
     //Mesh loaded with precomputed normals
-    openOFF("data/elephant_n.off", mesh.vertices, mesh.normals, mesh.triangles, mesh.triangle_normals);
+    openOFF("data/elephant_n.off", originalMesh.vertices, originalMesh.normals, originalMesh.triangles, originalMesh.triangle_normals);
+    //openOFF("data/unit_sphere_n.off", originalMesh.vertices, originalMesh.normals, originalMesh.triangles, originalMesh.triangle_normals);
+    //openOFF("data/avion_n.off", originalMesh.vertices, originalMesh.normals, originalMesh.triangles, originalMesh.triangle_normals);
+    //openOFF("data/camel_n.off", originalMesh.vertices, originalMesh.normals, originalMesh.triangles, originalMesh.triangle_normals);
 
-    //Completer les fonction de calcul de normals
-    mesh.computeNormals();
-
-    basis = Basis();
-
-    //A faire : Appliquer une matrice de transformation aux points
-    mesh_transformation.rotation = Mat3::Identity();
-    mesh_transformation.translation = Vec3( 1., 0., 0. );
-
-    for( unsigned int i = 0 ; i < mesh.vertices.size() ; ++i ) {
-        transformed_mesh.vertices.push_back( mesh.vertices[i] + mesh_transformation.translation );
-    }
-
-    transformed_mesh.normals = mesh.normals;
-    transformed_mesh.triangles = mesh.triangles;
-    transformed_mesh.triangle_normals = mesh.triangle_normals;
+    mesh = originalMesh;
 
     glutMainLoop ();
     return EXIT_SUCCESS;

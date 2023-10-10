@@ -28,13 +28,16 @@ public:
     float length() const { return sqrt( squareLength() ); }
     void normalize() { float L = length(); mVals[0] /= L; mVals[1] /= L; mVals[2] /= L; }
     static float dot( Vec3 const & a , Vec3 const & b ) {
-       //Fonction à compléter
-        return rand(); //A remplacer par le résultat du produit scalaire
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     }
+
     static Vec3 cross( Vec3 const & a , Vec3 const & b ) {
-       //Fonction à compléter
-        return Vec3(); //A remplacer par le résultat du produit vectoriel
+        float c1 = a[1] * b[2] - a[2] * b[1];
+        float c2 = a[2] * b[0] - a[0] * b[2];
+        float c3 = a[0] * b[1] - a[1] * b[0];
+        return Vec3(c1, c2, c3);
     }
+
     void operator += (Vec3 const & other) {
         mVals[0] += other[0];
         mVals[1] += other[1];
@@ -116,9 +119,7 @@ public:
 
     Vec3 operator * (const Vec3 & p) // computes m.p
     {
-        //Fonction à completer
-        //Pour acceder a un element de la matrice (*this)(i,j) et du point p[i]
-        return Vec3(); //A remplacer par le résultat de la multiplication
+        return Vec3(vals[0] * p[0] + vals[1] * p[1] + vals[2] * p[2], vals[3] * p[0] + vals[4] * p[1] + vals[5] * p[2], vals[6] * p[0] + vals[7] * p[1] + vals[8] * p[2]);
     }
 
     Mat3 operator * (const Mat3 & m2)
@@ -363,6 +364,143 @@ Mat3 operator * (float s , const Mat3 & m)
 inline static std::ostream & operator << (std::ostream & s , Mat3 const & m)
 {
     s << m(0,0) << " \t" << m(0,1) << " \t" << m(0,2) << std::endl << m(1,0) << " \t" << m(1,1) << " \t" << m(1,2) << std::endl << m(2,0) << " \t" << m(2,1) << " \t" << m(2,2) << std::endl;
+    return s;
+}
+
+
+
+
+
+
+
+class Mat4
+{
+public:
+    ////////////         CONSTRUCTORS          //////////////
+    Mat4()
+    {
+        for(int i = 0; i < 16; ++i) 
+            vals[i] = 0;
+    }
+    Mat4(float v1, float v2, float v3, float v4, 
+         float v5, float v6, float v7, float v8, 
+         float v9, float v10, float v11, float v12,
+         float v13, float v14, float v15, float v16)
+    {
+        vals[0] = v1;   vals[1] = v2;   vals[2] = v3;   vals[3] = v4;
+        vals[4] = v5;   vals[5] = v6;   vals[6] = v7;   vals[7] = v8;
+        vals[8] = v9;   vals[9] = v10;  vals[10] = v11; vals[11] = v12;
+        vals[12] = v13; vals[13] = v14; vals[14] = v15; vals[15] = v16;
+    }
+    Mat4(const Mat4 & m)
+    {
+        for(int i = 0 ; i < 4 ; ++i )
+            for(int j = 0 ; j < 4 ; ++j )
+                (*this)(i,j) = m(i,j);
+    }
+
+    ////////        ACCESS TO COORDINATES      /////////
+    float operator () (unsigned int i , unsigned int j) const
+    { return vals[4*i + j]; }
+    float & operator () (unsigned int i , unsigned int j)
+    { return vals[4*i + j]; }
+
+    inline static Mat4 Identity()
+    {
+        return Mat4(1,0,0,0,  0,1,0,0,  0,0,1,0,  0,0,0,1);
+    }
+
+    inline static Mat4 Zero()
+    {
+        return Mat4();
+    }
+    Mat4 operator+(Mat4 matrix) const {
+        Mat4 result;
+        for (int i = 0; i < 16; i++)
+            result.vals[i] = vals[i] * matrix.vals[i];
+        return result;
+    }
+    Mat4& operator+=(Mat4 matrix)
+    {
+        for (int i = 0; i < 16; i++)
+            vals[i] += matrix.vals[i];
+        return *this;
+    }
+    Mat4 operator*(float scalar) const
+    {
+        Mat4 result;
+        for (int i = 0; i < 16; i++)
+            result.vals[i] = vals[i] * scalar;
+        return result;
+    }
+    Mat4& operator*=(float scalar)
+    {
+        for (int i = 0; i < 16; i++)
+            vals[i] *= scalar;
+        return *this;
+    }
+    float determinant() const
+    {
+        // Using Laplace's expansion.
+        float det = 0.0f;
+
+        for (int j = 0; j < 4; j++)
+            det += (j % 2 == 0 ? 1 : -1) * vals[j] * this->minor(0, j).determinant();
+
+        return det;
+    }
+
+    Mat3 minor(int r, int c) const
+    {
+        Mat3 result;
+        int rowIndex = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            if (i == r)
+                continue;
+
+            int colIndex = 0;
+            for (int j = 0; j < 4; j++)
+            {
+                if (j == c)
+                    continue;
+
+                result(rowIndex, colIndex) = this->operator()(i, j);
+                colIndex++;
+            }
+            rowIndex++;
+        }
+        return result;
+    }
+    Mat4 inverse() const
+    {
+        float det = this->determinant();
+
+        if (det == 0.0f)
+            throw std::runtime_error("Matrix is singular and cannot be inverted.");
+
+        Mat4 adjugate;
+        for (int i = 0; i < 4; i++)
+        {
+            for (int j = 0; j < 4; j++)
+            {
+                // Compute cofactor, adjust sign based on row+col, and transpose to get adjugate.
+                adjugate(j, i) = ((i + j) % 2 == 0 ? 1 : -1) * this->minor(i, j).determinant();
+            }
+        }
+
+        return adjugate * (1.0f / det);
+    }
+
+
+    
+    float vals[16];
+};
+
+
+inline static std::ostream & operator << (std::ostream & s , Mat4 const & m)
+{
+    s << m(0,0) << " \t" << m(0,1) << " \t" << m(0,2) << "\t" << m(0, 3) << std::endl << m(1,0) << " \t" << m(1,1) << " \t" << m(1,2) << "\t" << m(1, 3) << std::endl << m(2,0) << " \t" << m(2,1) << " \t" << m(2,2) << "\t" << m(2, 3) << std::endl << m(3,0) << " \t" << m(3,1) << " \t" << m(3,2) << "\t" << m(3, 3) << std::endl;
     return s;
 }
 
