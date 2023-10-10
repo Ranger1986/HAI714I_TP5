@@ -64,6 +64,11 @@ struct Mesh {
 
 struct GridData {
     // Information to store in the grid's cells
+    //std::vector<unsigned int> vertices;
+    Vec3 pos;
+    Vec3 norm;
+    int nbVertices;
+
 };
 struct Grid {
     std::vector<GridData> cells;
@@ -82,17 +87,91 @@ struct Grid {
 void Mesh::simplify(unsigned int resolution) {
     std::cerr << "Simplification to be done." << std::endl;
     // Compute the cube C that englobes all vertices
-
+    Vec3 max=this->vertices[0];
+    Vec3 min=this->vertices[0];
+    for (int i = 0; i < this->vertices.size(); i++)
+    {
+        for (int dim = 0; dim < 3; dim++)
+        {
+            float valeur_evalue = this->vertices[i][dim];
+            if (max[dim]<valeur_evalue)
+            {
+                max[dim]=valeur_evalue;
+            }
+            else if (min[dim]> valeur_evalue)
+            {
+                min[dim]=valeur_evalue;
+            }            
+        }
+        
+    }
+    
     // Create a grid of size resolution x resolution x resolution in the cube
+    Grid gr;
+    gr.maxPos=max;
+    gr.minPos=min;
+    gr.resolution=resolution;
+    for (int x = 0; x < resolution; x++)
+    {
+        for (int y = 0; y < resolution; y++)
+        {
+            for (int z = 0; z < resolution; z++)
+            {
+                GridData new_cell;
+                new_cell.nbVertices=0;
+                new_cell.norm=Vec3(0,0,0);
+                new_cell.pos=Vec3(0,0,0);
+                gr.cells.push_back(new_cell);
+            }
+            
+        }
+        
+    }
+    
 
     // For each vertex, add the position and normal to its representant in the grid
     // (Count the number of vertices per cell)
+    for (int i = 0; i < this->vertices.size(); i++)
+    {
+        gr.cells[gr.getIndex(this->vertices[i])].nbVertices++;
+        gr.cells[gr.getIndex(this->vertices[i])].norm+=this->normals[i];
+        gr.cells[gr.getIndex(this->vertices[i])].pos+=this->vertices[i];
+    }
 
     // For each triangle t, set the indices of its vertices to point to representants
     // If 2 vertices share the same representant, remove the triangle
-
+    std::vector< Triangle > new_triangles;
+    for (int i = 0; i < this->triangles.size(); i++)
+    {
+        int rep1=gr.getIndex(this->vertices[this->triangles[i][0]]);
+        int rep2=gr.getIndex(this->vertices[this->triangles[i][1]]);
+        int rep3=gr.getIndex(this->vertices[this->triangles[i][2]]);
+        if (rep1!=rep2&&rep2!=rep3&&rep3!=rep1)
+        {
+            Triangle new_triangle = Triangle(rep1,rep2,rep3);
+            new_triangles.push_back(new_triangle);
+        }
+    }
+    //this->triangles.clear();
+    this->triangles=new_triangles;
+    
     // Divide the position of each representant by the number of vertices in the cell.
     // Normalize the normals
+    std::vector< Vec3 > new_vertices;
+    std::vector< Vec3 > new_normals;
+    for (long i = 0; i < (resolution*resolution*resolution); i++)
+    {
+        Vec3 pos= gr.cells[i].pos/gr.cells[i].nbVertices;
+        Vec3 norm= gr.cells[i].norm;
+        norm.normalize();
+        new_vertices.push_back(pos);
+        new_normals.push_back(norm);
+    }
+    //this->vertices.clear();
+    //this->normals.clear();
+    this->vertices=new_vertices;
+    this->normals=new_normals;
+    
 
     // BONUS EXERCICE : Instead of using the mean position of the vertices in the cell,
     // use the QEM proposed in "Out-of-core simplification of large polygonal models."
